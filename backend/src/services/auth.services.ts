@@ -1,15 +1,18 @@
 import { JWT_REFRESH_SECRET, JWT_SECRET } from "../constans/env";
+import { CONFLICT } from "../constans/http";
 import VerificationCodeType from "../constans/verificationCodeTypes";
 import SessionModel from "../models/sessionModel";
 import UserModel from "../models/user.model";
 import VerificationCodeModel from "../models/verificationCode.model";
+import appAssert from "../utils/appAssert";
 import { oneYearFromNow } from "../utils/date";
 import jwt from "jsonwebtoken";
 
 export type createAccountparams = {
   email: string;
   password: string;
-  userAgent: string;
+
+  userAgent?: string;
 };
 
 export const createAccount = async (data: createAccountparams) => {
@@ -17,9 +20,7 @@ export const createAccount = async (data: createAccountparams) => {
 
   const existingUser = await UserModel.exists({ email: data.email });
 
-  if (existingUser) {
-    throw new Error("El usuario ya existe");
-  }
+  appAssert(!existingUser, CONFLICT, "El usuario ya existe");
 
   // create user
 
@@ -35,6 +36,7 @@ export const createAccount = async (data: createAccountparams) => {
     type: VerificationCodeType.EmailVerification,
     expiresAt: oneYearFromNow(),
   });
+  console.log("Código de verificación creado:", verificationCode);
 
   // send verificaction email
 
@@ -44,6 +46,8 @@ export const createAccount = async (data: createAccountparams) => {
     userId: user._id,
     userAgent: data.userAgent,
   });
+
+  console.log("Sesión creada:", session);
 
   // sign access token & refresh token
 
@@ -63,6 +67,8 @@ export const createAccount = async (data: createAccountparams) => {
       expiresIn: "30m",
     }
   );
+
+  console.log("Tokens creados:", { accessToken, refreshToken });
 
   // return user & tokens
 
