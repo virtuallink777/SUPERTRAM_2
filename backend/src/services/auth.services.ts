@@ -1,5 +1,5 @@
 import { JWT_REFRESH_SECRET, JWT_SECRET } from "../constans/env";
-import { CONFLICT } from "../constans/http";
+import { CONFLICT, UNAUTHORIZED } from "../constans/http";
 import VerificationCodeType from "../constans/verificationCodeTypes";
 import SessionModel from "../models/sessionModel";
 import UserModel from "../models/user.model";
@@ -81,7 +81,7 @@ export const createAccount = async (data: createAccountparams) => {
     // return user & tokens
 
     return {
-      user,
+      user: user.omitPassword(),
 
       accessToken,
       refreshToken,
@@ -94,3 +94,65 @@ export const createAccount = async (data: createAccountparams) => {
     };
   }
 };
+
+
+type LoginParams = {
+  email: string,
+  password: string,
+  userAgent?: string
+
+}
+
+
+export const loginUser = async ({email, password, userAgent} : LoginParams) => {
+  // get user by email
+
+  const user = await UserModel.findOne({ email });
+  appAssert(user, UNAUTHORIZED, "Credenciales incorrectas");
+
+
+  // validate password from the request
+
+  const isValid =  await user.comparePassword(password);
+  appAssert(isValid, UNAUTHORIZED, "Credenciales incorrectas");
+
+  const userId = user._id;
+
+  // create a session
+
+  const session = await SessionModel.create({
+    userId,
+    userAgent
+  });
+
+  const sessionInfo = {
+    sessionId: session._id,
+  }
+  // sign access token & refresh token
+
+  const refreshToken = jwt.sign(
+    { sessionInfo },
+    JWT_REFRESH_SECRET,
+    {
+      audience: ["user"],
+      expiresIn: "1d",
+    }
+  );
+  const accessToken = jwt.sign(
+    { userId: user._id, ...sessionInfo},
+    JWT_SECRET,
+    {
+      audience: ["user"],
+      expiresIn: "30m",
+    }
+  );
+
+
+  // return user & tokens
+
+  return {
+    user: user.omitPassword(),
+    accessToken,
+    refreshToken,
+  };
+}
