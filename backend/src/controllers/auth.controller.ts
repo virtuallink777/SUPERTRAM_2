@@ -1,9 +1,12 @@
+
 import { z } from "zod";
 import catchErrors from "../utils/catchErrors";
 import { createAccount, loginUser } from "../services/auth.services";
 import { CREATED, OK } from "../constans/http";
-import { setAuthCookies } from "../utils/cookies";
+import { clearAuthCookies, setAuthCookies } from "../utils/cookies";
 import { loginSchema, registerSchema } from "../controllers/auth.schemas";
+import { AccessTokenPayload, verifyToken } from "../utils/jwt";
+import SessionModel from "../models/sessionModel";
 
 
 
@@ -41,4 +44,18 @@ export const loginHandler = catchErrors(async (req, res) => {
     .status(OK)
     .json({message: "Logueado correctamente"});
 
+});
+
+export const logoutHandler = catchErrors(async (req, res) => {
+  const accessToken = req.cookies.accessToken;
+  const {payload} = verifyToken<AccessTokenPayload>(accessToken);
+
+  if(payload) {
+    await SessionModel.findByIdAndDelete(payload.sessionId);
+  }
+  
+  clearAuthCookies(res).
+  status(OK).json({message: "Cierre de sesión exitoso"})
+  
+  
 });

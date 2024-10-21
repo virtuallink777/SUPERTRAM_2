@@ -7,6 +7,10 @@ import VerificationCodeModel from "../models/verificationCode.model";
 import appAssert from "../utils/appAssert";
 import { oneYearFromNow } from "../utils/date";
 import jwt from "jsonwebtoken";
+import { refreshTokenSignOptions, signToken } from "../utils/jwt";
+
+
+
 
 export type createAccountparams = {
   email: string;
@@ -39,8 +43,10 @@ export const createAccount = async (data: createAccountparams) => {
 
     // create verification code
 
+    const userId = user._id;
+
     const verificationCode = await VerificationCodeModel.create({
-      userId: user._id,
+      userId,
       type: VerificationCodeType.EmailVerification,
       expiresAt: oneYearFromNow(),
     });
@@ -51,7 +57,7 @@ export const createAccount = async (data: createAccountparams) => {
     // create session
 
     const session = await SessionModel.create({
-      userId: user._id,
+      userId,
       userAgent: data.userAgent,
     });
 
@@ -59,22 +65,24 @@ export const createAccount = async (data: createAccountparams) => {
 
     // sign access token & refresh token
 
-    const refreshToken = jwt.sign(
-      { sessionId: session._id },
-      JWT_REFRESH_SECRET,
-      {
-        audience: ["user"],
-        expiresIn: "1d",
-      }
-    );
-    const accessToken = jwt.sign(
-      { userId: user._id, sessionId: session._id },
-      JWT_SECRET,
-      {
-        audience: ["user"],
-        expiresIn: "30m",
-      }
-    );
+
+    const sessionInfo ={
+      sessionId: session._id,
+    }
+
+    const refreshToken = signToken(
+      sessionInfo, refreshTokenSignOptions
+    )
+    
+   
+
+
+    const accessToken = signToken(
+     { ...sessionInfo,
+      userId,
+     },
+    )
+    
 
     console.log("Tokens creados:", { accessToken, refreshToken });
 
