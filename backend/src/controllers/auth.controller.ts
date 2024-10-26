@@ -1,20 +1,32 @@
-
 import { z } from "zod";
 import catchErrors from "../utils/catchErrors";
-import { createAccount, loginUser } from "../services/auth.services";
-import { CREATED, OK } from "../constans/http";
-import { clearAuthCookies, setAuthCookies } from "../utils/cookies";
-import { loginSchema, registerSchema } from "../controllers/auth.schemas";
+import {
+  createAccount,
+  loginUser,
+  refreshUserAccessToken,
+  verifyEmail,
+} from "../services/auth.services";
+import { CREATED, OK, UNAUTHORIZED } from "../constans/http";
+import {
+  clearAuthCookies,
+  getAccessTokenCookieOptions,
+  getRefreshTokenCookieOptions,
+  setAuthCookies,
+} from "../utils/cookies";
+import {
+  loginSchema,
+  registerSchema,
+  verificationCodeShema,
+} from "../controllers/auth.schemas";
 import { AccessTokenPayload, verifyToken } from "../utils/jwt";
 import SessionModel from "../models/sessionModel";
-
-
+import appAssert from "../utils/appAssert";
 
 export const registerHandler = catchErrors(async (req, res) => {
   // validate request
   const request = registerSchema.parse({
     ...req.body,
-    userAgent: req.headers["user-agent"]
+    userAgent: req.headers["user-agent"],
   });
 
   // call services
@@ -36,26 +48,58 @@ export const registerHandler = catchErrors(async (req, res) => {
 });
 
 export const loginHandler = catchErrors(async (req, res) => {
-  const request = loginSchema.parse({...req.body, userAgent: req.headers["user-agent"]});
+  const request = loginSchema.parse({
+    ...req.body,
+    userAgent: req.headers["user-agent"],
+  });
 
-  const {accessToken, refreshToken} = await loginUser(request);
+  const { accessToken, refreshToken } = await loginUser(request);
 
   return setAuthCookies({ res, accessToken, refreshToken })
     .status(OK)
-    .json({message: "Logueado correctamente"});
-
+    .json({ message: "Logueado correctamente" });
 });
 
 export const logoutHandler = catchErrors(async (req, res) => {
-  const accessToken = req.cookies.accessToken;
-  const {payload} = verifyToken<AccessTokenPayload>(accessToken);
+  const accessToken = req.cookies.accessToken as string | undefined;
+  const { payload } = verifyToken(accessToken || "");
 
-  if(payload) {
+  if (payload) {
     await SessionModel.findByIdAndDelete(payload.sessionId);
   }
-  
-  clearAuthCookies(res).
-  status(OK).json({message: "Cierre de sesión exitoso"})
-  
-  
+
+  return clearAuthCookies(res);
+  res.status(OK).json({
+    message: "Deslogueo Exitoso",
+  });
+});
+
+export const refreshHandler = catchErrors(async (req, res) => {
+  const refreshToken = req.cookies.refreshToken as string | undefined;
+  appAssert(refreshToken, UNAUTHORIZED, "Missing refresh token");
+
+  const { accessToken, newRefreshToken } = await refreshUserAccessToken(
+    refreshToken
+  );
+
+  if (newRefreshToken) {
+    res.cookie("refreshToken", newRefreshToken, getRefreshTokenCookieOptions());
+  }
+
+  return res
+    .status(OK)
+    .cookie("accessToken", accessToken, getAccessTokenCookieOptions())
+    .json({
+      message: "Access token refreshed",
+    });
+});
+
+export const verifyEmailHandler = catchErrors(async (req, res) => {
+  const verificationCode = verificationCodeShema.parse(req.params.code);
+
+  await verifyEmail(verificationCode);
+
+  return res.status(OK).json({
+    message: "Email Verified",
+  });
 });
