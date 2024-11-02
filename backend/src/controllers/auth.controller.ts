@@ -4,6 +4,8 @@ import {
   createAccount,
   loginUser,
   refreshUserAccessToken,
+  resetPassword,
+  sendPasswordResetEmail,
   verifyEmail,
 } from "../services/auth.services";
 import { CREATED, OK, UNAUTHORIZED } from "../constans/http";
@@ -14,13 +16,17 @@ import {
   setAuthCookies,
 } from "../utils/cookies";
 import {
+  emailSchema,
+  forgotPasswordSchema,
   loginSchema,
   registerSchema,
+  resetPasswordSchema,
   verificationCodeShema,
 } from "../controllers/auth.schemas";
 import { AccessTokenPayload, verifyToken } from "../utils/jwt";
 import SessionModel from "../models/sessionModel";
 import appAssert from "../utils/appAssert";
+import { transport } from "../config/nodemailer";
 
 export const registerHandler = catchErrors(async (req, res) => {
   // validate request
@@ -101,5 +107,33 @@ export const verifyEmailHandler = catchErrors(async (req, res) => {
 
   return res.status(OK).json({
     message: "Email Verified",
+  });
+});
+
+// send email reset password
+
+export const sendPasswordResetHandler = catchErrors(async (req, res) => {
+  // validar request
+  const request = forgotPasswordSchema.parse(req.body);
+
+  // Llamar al servicio que crearemos
+  await sendPasswordResetEmail(request.email);
+
+  // retornar respuesta
+  return res.status(OK).json({
+    message:
+      "Si el mail existe, recibiras un enlace para restablecer la contraseña",
+  });
+});
+
+//  reset pasword
+
+export const resetPasswordHandler = catchErrors(async (req, res) => {
+  const request = resetPasswordSchema.parse(req.body);
+
+  await resetPassword(request);
+
+  return clearAuthCookies(res).status(OK).json({
+    message: "el password fue cambiado con exito",
   });
 });
