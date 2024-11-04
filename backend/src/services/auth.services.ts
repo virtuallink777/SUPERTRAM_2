@@ -16,7 +16,7 @@ import {
   ONE_DAY_MS,
   oneHourFromNow,
   oneYearFromNow,
-  thirtyDaysForNow,
+  thirtyDaysFromNow,
 } from "../utils/date";
 import jwt from "jsonwebtoken";
 import {
@@ -151,7 +151,7 @@ export const loginUser = async ({
   const session = await SessionModel.create({
     userId,
     userAgent,
-    expiresAt: thirtyDaysForNow(),
+    expiresAt: thirtyDaysFromNow(),
   });
 
   const sessionInfo = {
@@ -231,7 +231,7 @@ export const refreshUserAccessToken = async (refreshToken: string) => {
   // refresh the session if it expires in the next 24 hours
   const sessionNeedsRefresh = session.expiresAt.getTime() - now <= ONE_DAY_MS;
   if (sessionNeedsRefresh) {
-    session.expiresAt = thirtyDaysForNow();
+    session.expiresAt = thirtyDaysFromNow();
     await session.save();
   }
 

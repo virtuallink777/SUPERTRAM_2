@@ -12,7 +12,7 @@ export const oneDayFromNow = () => {
 
 export const ONE_DAY_MS = 24 * 60 * 60 ** 1000;
 
-export const thirtyDaysForNow = () => {
+export const thirtyDaysFromNow = () => {
   return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 };
 

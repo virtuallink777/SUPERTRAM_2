@@ -1,42 +1,32 @@
 import { RequestHandler } from "express";
 import appAssert from "../utils/appAssert";
-import { UNAUTHORIZED } from "../constans/http";
 import AppErrorCode from "../constans/appErrorCode";
-import { verifyToken } from "../utils/jwt";
+import { UNAUTHORIZED } from "../constans/http";
+import { AccessTokenPayload, verifyToken } from "../utils/jwt";
 import { Types } from "mongoose";
 
-interface MyRequest extends Request {
-  userId: Types.ObjectId;
-  sessionId: Types.ObjectId;
-}
+// wrap with catchErrors() if you need this to be async
+const authenticate: RequestHandler = (req, res, next) => {
+  const accessToken = req.cookies.accessToken as string | undefined;
+  appAssert(accessToken, UNAUTHORIZED, "Not authorized");
 
-const authenticate: RequestHandler<
-  unknown,
-  unknown,
-  unknown,
-  unknown,
-  MyRequest
-> = (req, res, next) => {
-  const accessToken = req.cookies.accessToken as string;
-  console.log(req.userId);
-  appAssert(
-    accessToken,
-    UNAUTHORIZED,
-    "Acceso no permitido",
-    AppErrorCode.invalidAccessToken
-  );
-
-  const { error, payload } = verifyToken(accessToken);
+  const { error, payload } = verifyToken<AccessTokenPayload>(accessToken);
   appAssert(
     payload,
     UNAUTHORIZED,
-    error === "jwt expired" ? "token expired" : "Invalid token",
-    AppErrorCode.invalidAccessToken
+    error === "jwt expired" ? "Token expired" : "Invalid token"
   );
 
-  req.userId = payload.userId as Types.ObjectId;
-  req.sessionId = payload.sessionId as Types.ObjectId;
-  next();
+  if (
+    typeof payload.userId === "string" &&
+    typeof payload.sessionId === "string"
+  ) {
+    req.userId = new Types.ObjectId(payload.userId);
+    req.sessionId = new Types.ObjectId(payload.sessionId);
+    next();
+  } else {
+    throw new Error("Invalid payload format");
+  }
 };
 
 export default authenticate;

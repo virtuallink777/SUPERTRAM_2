@@ -55,7 +55,7 @@ export const signToken = (
 export const verifyToken = <TPayload extends object = AccessTokenPayload>(
   token: string,
   options?: VerifyOptions & { secret: string }
-) => {
+): VerifyResult<TPayload> => {
   const { secret = JWT_SECRET, ...verifyOpts } = options || {};
   try {
     const payload = jwt.verify(token, secret, {
@@ -69,6 +69,7 @@ export const verifyToken = <TPayload extends object = AccessTokenPayload>(
   } catch (error: any) {
     return {
       error: error.message,
+      payload: null,
     };
   }
 };
